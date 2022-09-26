@@ -5,13 +5,14 @@ use Illuminate\Http\Request;
 use App\Models\Meeting;
 use App\Models\User;
 use Carbon\Carbon;
+use JWTAuth;
 
 class MeetingController extends Controller
 {
     
     public function __construct()
     {
-        //$this=>middleware('name');
+        $this->middleware('jwt.auth' , ['only'=>['update','store','destroy']]);
     }
     
     /**
@@ -54,13 +55,19 @@ class MeetingController extends Controller
             'title' => 'required',
             'description' => 'required',
             'time' => 'required|date_format:YmdHie',
-            'user_id' => 'required'
         ]);
+
+        if(! $user = JWTAuth::parseToken()->authenticate()){
+
+            return response()->json(['msg' => 'User not found'],404);
+
+        };
+
         //
         $title = $request->input('title');
         $description = $request->input('description');
         $time = $request->input('time');
-        $user_id = $request->input('user_id');
+        $user_id = $user->id;
 
         $meeting = new Meeting ([
             'title' => $title,
@@ -128,14 +135,19 @@ class MeetingController extends Controller
             'title' => 'required',
             'description' => 'required',
             'time' => 'required|date_format:YmdHie',
-            'user_id' => 'required'
         ]);
-        //
 
+        if(!$user = JWTAuth::parseToken()->authenticate()){
+
+            return response()->json(['msg' => 'User not found'],404);
+
+        };
+
+        //
         $title = $request->input('title');
         $description = $request->input('description');
         $time = $request->input('time');
-        $user_id = $request->input('user_id');
+        $user_id = $user->id;
         $meeting = [
             'title' => $title,
             'description' => $description,
@@ -153,7 +165,7 @@ class MeetingController extends Controller
         $meeting = Meeting::with('users')->findOrFail($id);
 
         //if fail
-        if(!$meeting->users()->where('users.id', $user_id)->first()){
+        if(!$meeting->users()->where('users.id', $user->id)->first()){
 
             return response()->json(['msg'=>'user not registered for meeting, update not succeslful'],401);
 
@@ -197,6 +209,19 @@ class MeetingController extends Controller
         $meeting = Meeting::findorFail($id);
         ## OR
         ## $meeting = Meeting::with('users')->where('id', $id)->firstOrFail();->firstOrFail();
+        
+
+        if(!$user = JWTAuth::parseToken()->authenticate()){
+
+            return response()->json(['msg' => 'User not found'],404);
+
+        };
+
+        if(!$meeting->users()->where('users.id', $user->id)->first()){
+
+            return response()->json(['msg'=>'user not registered for meeting, update not succeslful'],401);
+
+        };
         
         //loop thru all users in meeting
         $users = $meeting->users;

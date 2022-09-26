@@ -1,11 +1,21 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use App\Models\Meeting;
+use App\Models\User;
 use Illuminate\Http\Request;
+use JWTAuth;
 
 class RegistrationController extends Controller
 {
+
+    
+    public function __construct()
+    {
+        $this->middleware('jwt.auth');
+    }
+    
+
     /**
      * Store a newly created resource in storage.
      *
@@ -24,20 +34,26 @@ class RegistrationController extends Controller
         $meeting_id = $request->input('meeting_id');
         $user_id = $request->input('user_id');
 
-        $meeting = [
-            'title' => 'Title',
-            'description' => 'Description',
-            'time' => 'Time',
-            'view_meeting' => [
-                'href' => 'api/v1/meeting/1',
-                'method' => 'GET'
+        $meeting = Meeting::findOrFail($meeting_id);
+        $user = User::findOrFail($user_id);
+
+
+        $message = [
+            'msg' => ' User is alraedy registered for meetings',
+            'meeting' => $meeting,
+            'user' => $user,
+            'unregister' =>[
+                'href' => 'api/v1/meeting/registration/' .  $meeting->id,
+                'method' => 'DELETE'
             ]
         ];
+        //If registered
+        if ($meeting->users()->where('user_id', $user->id)->first()){
+                return response()->json($message,400);
+        };
 
-        $user = [
-            'name' => 'Name'
-        ];
-
+        $user->meetings()->attach($meeting);
+       
         $response = [
             'msg' => ' User registered or meetings',
             'meeting' => $meeting,
@@ -63,19 +79,23 @@ class RegistrationController extends Controller
     //unregister a user to meeting
     public function destroy($id)
     {
-        $meeting = [
-            'title' => 'Title',
-            'description' => 'Description',
-            'time' => 'Time',
-            'view_meeting' => [
-                'href' => 'api/v1/meeting/1',
-                'method' => 'GET'
-            ]
-        ];
 
-        $user = [
-            'name' => 'Name'
-        ];
+        $meeting = Meeting::findOrFail($id);
+        
+        
+        if(!$user = JWTAuth::parseToken()->authenticate()){
+
+            return response()->json(['msg' => 'User not found'],404);
+
+        };
+
+        if(!$meeting->users()->where('users.id', $user->id)->first()){
+
+            return response()->json(['msg'=>'user not registered for meeting, delete not succeslful'],401);
+
+        };
+
+        $meeting -> users()->detach($user->id);
 
         $response = [
             'msg' => ' User unregistered for meetings',
